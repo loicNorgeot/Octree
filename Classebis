@@ -1,0 +1,400 @@
+#!/usr/bin/env python2
+# -*- coding: utf-8 -*-
+"""
+Created on Mon Jul  3 11:06:37 2017
+
+@author: iscdadm
+"""
+
+#!/usr/bin/env python2
+# -*- coding: utf-8 -*-
+"""
+Created on Wed Jun 28 16:23:53 2017
+
+@author: iscdadm
+"""
+import numpy as np 
+import time
+import random 
+import sys
+
+class Subdivision:
+    
+    tetraList=[]
+    def __init__(self,xMin,xMax,yMin,yMax,zMin,zMax):
+       
+        self.children=[]
+        self.xMin=xMin
+        self.xMax=xMax
+        self.yMin=yMin
+        self.yMax=yMax
+        self.zMin=zMin
+        self.zMax=zMax
+    def addTetra(self,tetraIndice):
+        self.tetraList.append(tetraIndice)
+    def addChildren(self,childrenIndice):
+        self.children.append(childrenIndice)
+    def isInDomain(self, pt):
+        if pt[0]<self.xMax and pt[0]>=self.xMin and pt[1]<self.yMax and pt[1]>=self.yMin and pt[2]<self.zMax and pt[2]>=self.zMin:
+            return True
+        else:
+            return False
+    def isTetrainsub(self,tab,num):
+        
+        c = np.mean([[t[0][j] for j in range(3)] for t in tab],axis=0)
+        r = np.max( [ np.linalg.norm(np.array(t[0]) - c) for t in tab] )
+      
+        a=[0,0,0]
+        temp=np.zeros((8,3))
+        z=-1
+        for i in range(1,3):
+           
+            a[0]=c[0]+r*(-1)**i
+            for j in range(1,3):
+                a[1]=c[1]+r*(-1)**j
+                for k in range(1,3):
+                    z=z+1
+                    a[2]=c[2]+r*(-1)**k
+                    temp[z,:3]=a 
+      
+           
+      
+       
+        for i in range(0,8):
+            if temp[i,0]>self.xMin and temp[i,1]>self.yMin and temp[i,2]>self.zMin and temp[i,0]<self.xMax and temp[i,1]<self.yMax and temp[i,2]<self.zMax:
+                return True
+            else: 
+                continue 
+        """if c[0]-r>self.xMin and c[1]-r>self.yMin and c[2]-r>self.zMin and c[0]-r<self.xMax and c[1]-r<self.yMax and c[2]-r<self.zMax:
+            return True
+        else: 
+            return False
+        #if
+        
+        for l in range(0,4):
+            if tab[l][0][0]<self.xMax and tab[l][0][0]>=self.xMin and tab[l][0][1]<self.yMax and tab[l][0][1]>=self.yMin and tab[l][0][2]<self.zMax and tab[l][0][2]>=self.zMin:
+                return True
+            else: 
+                continue 
+        """
+def tabpardeux(Sub):
+    tab=[Sub.xMin,Sub.xMax,Sub.yMin,Sub.yMax,Sub.zMin,Sub.zMax]
+    
+    tabmoitie=[]
+   
+    for j in range(1,4):
+        
+        tabmoitie.append(tab[2*j-2])
+
+      
+        tabmoitie.append(tab[2*j-2]+(abs(tab[2*j-1]-tab[2*j-2]))/2) 
+       
+        tabmoitie.append(tab[2*j-1])
+    return tabmoitie
+def partition8(Sub):
+    tabmoitie=tabpardeux(Sub)
+    l=-1
+    for i in range(0,2):
+        xMin=tabmoitie[i]
+        xMax=tabmoitie[i+1]
+        for j in range(2,4):
+            yMin=tabmoitie[j+1]
+            yMax=tabmoitie[j+2]
+            for k in range(4,6):
+                 l=l+1
+                 zMin=tabmoitie[k+2]
+                 zMax=tabmoitie[k+3]
+                 a=Subdivision(xMin,xMax,yMin,yMax,zMin,zMax)
+                 
+        
+                 Sub.addChildren(a)
+                 
+                
+
+    return Sub
+ 
+
+def octree1(firstdivision,ordre,compteur,listtetra):
+ 
+    if compteur==ordre+1:
+     
+        return firstdivision 
+                
+    else: 
+       
+        partition8(firstdivision)
+    
+       
+        for i in range(0,len(firstdivision.children)): 
+         
+                
+            listedetetra1(firstdivision.children[i],listtetra,Tetrahedras,data)
+            octree1(firstdivision.children[i],ordre,compteur+1,firstdivision.children[i].tetraList)
+
+    
+    
+ 
+def listedetetra1(x,listetra,Tetrahedra,data):
+    x.tetraList=[]
+    for u in listetra:
+            
+            if x.isTetrainsub([[data[Tetrahedras[u,1]-1,:3]],[data[Tetrahedras[u,2]-1,:3]],[data[Tetrahedras[u,3]-1,:3]],[data[Tetrahedras[u,4]-1,:3]]],u)==True:
+                x.addTetra(u)
+              
+    return x 
+
+   
+                        
+         
+def inwhichsubispt(pt,Subdivision,ordre,compteur):
+
+    if compteur==ordre+1:
+          if Subdivision==None:
+              return "N'appartient pas à un tétrahèdre"
+          else: 
+              return Subdivision   
+    else:
+        for i in range(0,8):
+             
+            if Subdivision.children[i].isInDomain(pt)==True:
+                a=Subdivision.children[i]
+                return inwhichsubispt(pt,a,ordre,compteur+1)
+    
+        
+  
+                              
+   
+    
+        
+def isptintetra(pt,Subdivision,ordre,compteur,Tetrahedra,data):
+    a=inwhichsubispt(pt,Subdivision,ordre,compteur)
+
+
+   
+    
+    if a==None:
+        return "N'appartient pas à un tétrahèdre"
+    else: 
+        isptintetra=-3
+        for j in a.tetraList:
+            
+               
+                p1=data[Tetrahedra[j,1]-1,:3]
+                p2=data[Tetrahedra[j,2]-1,:3]
+                p3=data[Tetrahedra[j,3]-1,:3]
+                p4=data[Tetrahedra[j,4]-1,:3]
+                A=np.ones((4,4))
+                A[0,:3]=p1
+                A[1,:3]=p2
+                A[2,:3]=p3
+                A[3,:3]=p4
+                Z=np.copy(A)
+                detA=np.linalg.det(Z)
+                B=A
+                B[0,:3]=pt
+                
+                detB=np.linalg.det(B)
+                A[0,:3]=p1
+                C=A
+                C[1,:3]=pt
+                detC=np.linalg.det(C)
+                A[1,:3]=p2
+                D=A
+                D[2,:3]=pt
+                detD=np.linalg.det(D)
+                A[2,:3]=p3
+                
+                E=A
+                E[3,:3]=pt
+                detE=np.linalg.det(E)
+                A[3,:3]=p4
+                if detA>=0 and detB>=0 and detC>=0 and detD>=0 and detE>=0:
+                    isptintetra=j
+                    break
+                if detA<=0 and detB<=0 and detC<=0 and detD<=0 and detE<=0:
+                    isptintetra=j
+                    break
+        if isptintetra==-3:
+            return "N'appartient pas à un tétrahèdre"
+        else :
+            return isptintetra 
+        
+def dataconstruction(nomfichier):
+    fichier=open(nomfichier,"r")
+    chaine="Vertices"
+    d=0
+    for ligne in fichier:
+        d=d+1
+        if chaine in ligne:
+           break 
+    fichier.seek(0)
+    b=fichier.readlines()
+    e=int(b[d])
+    data=np.zeros((e,3))
+    i=d
+    for t in data: 
+      i=i+1
+      c=b[i].split()
+      t[0]=float(c[0])
+      t[1]=float(c[1])
+      t[2]=float(c[2])
+    fichier.seek(0)
+    return data,e
+    
+def Tetrahedrasconstruction(nomfichier):
+    fichier=open(nomfichier,"r")
+    chaine="Tetrahedra" 
+    d=0
+    for ligne in fichier:
+         d=d+1
+         if chaine in ligne:
+            break
+    fichier.seek(0)
+    b=fichier.readlines()
+    r=int(b[d])
+    Tetrahedras=np.zeros((r,5))
+    i=-1
+    for t in Tetrahedras:
+        i=i+1
+        f=b[d+i+1].split()  
+        t[0]=i 
+        t[1]=int(f[0])
+        t[2]=int(f[1])
+        t[3]=int(f[2])
+        t[4]=int(f[3])
+    listtetra=[]
+    for i in range(0,len(Tetrahedras)):
+        listtetra.append(i)
+    return Tetrahedras,listtetra
+def solutionsconstruction(nomfichier,nbligne):
+    fichier2=open(nomfichier,"r")
+    j=fichier2.readlines()
+    i=-1
+    solutions=np.zeros((nbligne,3))
+    for t in solutions:
+        i=i+1
+        p=j[5+i].split()
+        t[0]=float(p[0])
+        t[1]=float(p[1])
+        t[2]=float(p[2]) 
+    return solutions 
+def constructionespace(data):
+    xMax,yMax,zMax=np.amax(data,axis=0)
+    xMin,yMin,zMin=np.amin(data,axis=0)
+    return Subdivision(xMin,xMax,yMin,yMax,zMin,zMax)
+
+def interpolate(pt,Tetrahedra,data,solutions,ordre):
+# Renvoie la vitesse interpolée du point pt selon la moyenne des vitesses pondérées inversement à l'éloignement des points du tétrahèdre auquel il appartient.
+  num=isptintetra(pt,Subway,ordre,1,Tetrahedra,data)
+  if num=="N'appartient pas à un tétrahèdre":
+      return "N'appartient pas à un tétrahèdre"
+  else : 
+      num=int(num)
+      solAtPt=np.array([0,0,0],dtype=float)
+      a=int(Tetrahedras[num,1])
+      b=int(Tetrahedras[num,2])
+      c=int(Tetrahedras[num,3])
+      d=int(Tetrahedras[num,4])
+      p1=data[a-1,:3]
+      p2=data[b-1,:3]
+      p3=data[c-1,:3]
+      p4=data[d-1,:3]
+      d1=np.inner(p1-pt,p1-pt)
+      d2=np.inner(p2-pt,p2-pt)
+      d3=np.inner(p3-pt,p3-pt)
+      d4=np.inner(p4-pt,p4-pt)
+      sommed=(1/d1)+(1/d2)+(1/d3)+(1/d4)    
+      solAtPt[0]=((1/d1)*solutions[a-1,0]+(1/d2)*solutions[b-1,0]+(1/d3)*solutions[c-1,0]+(1/d4)*solutions[d-1,0])/sommed
+    
+      solAtPt[1]=((1/d1)*solutions[a-1,1]+(1/d2)*solutions[b-1,1]+(1/d3)*solutions[c-1,1]+(1/d4)*solutions[d-1,1])/sommed
+      solAtPt[2]=((1/d1)*solutions[a-1,2]+(1/d2)*solutions[b-1,2]+(1/d3)*solutions[c-1,2]+(1/d4)*solutions[d-1,2])/sommed
+     
+
+      return solAtPt 
+
+def position(pt,Tetrahedra,data,solutions,pas,ordre):
+#    Renvoie la prochaine position du point pt suivant la vitesse interpolée et un pas
+    v=interpolate(pt,Tetrahedra,data,solutions,ordre)
+    if v=="N'appartient pas à un tétrahèdre":
+        return "N'appartient pas à un tétrahèdre"
+    else:
+        u=v*pas
+        newp=pt+u
+        return newp
+def trajectoire1(pointraj,Tetrahedra,data,solutions,pas,ordre):
+#Renvoie toute la trajectoire du point pt jusqu'à ce qu'un point sorte du tétrahèdre, en utilisant le voisinage.
+    ensembletraj=np.zeros((4000,500))
+    k=0
+    y=3
+    m,n=np.shape(pointraj)
+
+    for j in range (0,m):
+        traj=np.array([[0.,0.,0.],[0.,0.,0.]])
+        pt=pointraj[j,:]
+        traj[0] = pt
+        newp=position(pt,Tetrahedras,data,solutions,pas,ordre) 
+        print newp 
+        if newp=="N'appartient pas à un tétrahèdre":
+            continue 
+        else:
+            
+            traj[1]=newp
+            ensembletraj[0,k:y]=traj[0]
+            ensembletraj[1,k:y]=traj[1]
+           
+    
+          
+            z=2
+            while newp !="N'appartient pas à un tétrahèdre":
+                newp=position(newp,Tetrahedras,data,solutions,pas,ordre)
+                print newp
+                if newp =="N'appartient pas à un tétrahèdre":
+                    break 
+                ensembletraj[0:z+1,k:y]=np.vstack((ensembletraj[0:z,k:y],newp))
+                z=z+1
+            
+                    
+                
+            k=y
+            y=y+3
+            
+    return ensembletraj
+def randomtableau(n,Subway):
+    pointraj=np.zeros((n,3))
+    for i in range(0,n):
+        
+        pointraj[i,:3]=[random.uniform(Subway.xMin,Subway.xMax),(Subway.yMin)+0.023,random.uniform(Subway.zMin,Subway.zMax)]
+    return pointraj
+if __name__ == "__main__":
+    
+    data,nbligne=dataconstruction("snailbox3d1.mesh")  
+    Tetrahedras,listtetra=Tetrahedrasconstruction("snailbox3d1.mesh")
+    solutions=solutionsconstruction("snailbox3d1.sol",nbligne)
+    Subway=constructionespace(data)
+    print "Salut, c'est Nénette qui te parle! Rentre l'ordre de ton octree please"
+    print "Ordre=" 
+    ordre=input()
+    octree1(Subway,ordre,1,listtetra)
+    print "Nénette fière!C'est bien t'es un bon! Maintenant, mets le point que tu veux"
+    print "x="
+    x=input()
+    print "y="
+    y=input()
+    print "z="
+    z=input()
+    pt=[x,y,z]
+    t0=time.time()
+    print isptintetra(pt,Subway,ordre,1,Tetrahedras,data)
+    print time.time()-t0
+    print "Combien de points random veux-tu générer, Nénette va te faire ça?"
+    print "n="
+    n=input()
+    pointraj=randomtableau(n,Subway)
+    trajectoire1(pointraj,Tetrahedras,data,solutions,0.05,ordre)
+    print "Et voilà collègue" 
+    
+    """[-0.00542613,-0.00150938,-0.10106775]
+
+   [ 0.29042848  0.44919505  0.97564905]
+    0.6,-1.75,0.95"""
+    
