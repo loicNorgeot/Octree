@@ -48,6 +48,11 @@ class aNode:
         print self.depth
         print "[%.2f %.2f] [%.2f %.2f] [%.2f %.2f]" % (self.xmin,self.xmax, self.ymin, self.ymax, self.zmin, self.zmax)
 
+class node:
+    def __init__(self):
+        self.tets = []
+        self.pts  = []
+
 def isPointInTetra(pt,pts):
     A=np.ones((4,4))
     A[:,:3]=pts
@@ -75,20 +80,76 @@ def computeVelocity(pt, octree):
             break
     return velocity
 
+def getOctreeIndices(mesh,depth):
+    tmpPts = np.copy(mesh.verts[:,:3])
+    tmpPts-=[mesh.xmin, mesh.ymin,mesh.zmin]
+    tmpPts/=mesh.dims
+    tmpPts*=2**depth
+    tmpPts[tmpPts==2**depth]=2**depth-1
+    tmpPts = tmpPts.astype(np.int16, copy=False)
+    return tmpPts
+def getPtIndices(pt,depth):
+    ind = np.copy(pt)
+    ind-=[mesh.xmin, mesh.ymin,mesh.zmin]
+    ind/=mesh.dims
+    ind*=2**depth
+    ind = ind.astype(np.int16, copy=False)
+    ind[ind==2**depth]=2**depth-1
+    return ind
+
+
 if __name__ == "__main__":
     print "1 - Opening the .mesh file and the corresponding .sol file"
     mesh = msh.Mesh("demo/snailbox3d1.mesh")
     mesh.readSol()
 
     print "2 - Creating the octree structure"
-    depth = 5
+    depth = 2#512 div
     octree = aNode(depth, mesh.xmin,mesh.xmax,mesh.ymin,mesh.ymax,mesh.zmin,mesh.zmax)
+
+    t = time.time()
     ptsNodes   = [octree.attributePoint(v) for v in mesh.verts]
+    print "ptsNodes:", time.time() - t
+
+    t = time.time()
+    indices = getOctreeIndices(mesh,depth)
+    print "Indices:", time.time() - t
+
+    t = time.time()
+    points = [[[[] for k in range(2**depth)] for j in range(2**depth)] for j in range(2**depth)]
+    for i,pt in zip(indices,mesh.verts):
+        points[i[0]][i[1]][i[2]].append(pt)
+    print "Points:",time.time() - t
+
+    t = time.time()
+    tetras = [[[[] for k in range(2**depth)] for j in range(2**depth)] for j in range(2**depth)]
+    ok = 0
+    pasok = 0
+    for indTetra, tetra in enumerate(mesh.tets):
+        for ptIndex in tetra:
+            i = indices[ptIndex]
+            tetras[i[0]][i[1]][i[2]].append(indTetra)
+        if np.any(indices[tetra[0]]-indices[tetra[1]]) or np.any(indices[tetra[0]]-indices[tetra[2]]) or np.any(indices[tetra[0]]-indices[tetra[3]]):
+            pasok+=1
+        else:
+            ok+=1
+    print "Tetrahedra:", time.time() - t
+    print pasok, ok
+
+
+    t = time.time()
     tetraNodes = [set([ptsNodes[i] for i in tet[:4]]) for tet in mesh.tets]
+    print "TetraNodes:", time.time() - t
+
+    t = time.time()
     for i,nodeSet in enumerate(tetraNodes):
         for n in nodeSet:
             n.tetras.append(i)
+    print "Adding tets:", time.time() - t
+    print len(set(ptsNodes)), len(tetraNodes),len([t for t in tetraNodes if len(t)>1])
 
+
+    """
     print "3 - Computing the streamlines"
     nPoints = 10
     maxIterations = 1000
@@ -129,3 +190,4 @@ if __name__ == "__main__":
     print "Resolution en ", time.time() - t0, "s."
     for p,v in zip(positions,velocities):
         print len(p), len(v)
+    """
