@@ -4,8 +4,9 @@ import numpy as np
 import time
 import sys
 import msh
-
 import multiprocessing
+
+#Parallel functions
 def fun(f, q_in, q_out):
     while True:
         i, x = q_in.get()
@@ -26,8 +27,8 @@ def parmap(f, X, nprocs=multiprocessing.cpu_count()):
     [p.join() for p in proc]
     return [x for i, x in sorted(res)]
 
+#Maths
 def isPointInTetra(pt,pts):
-    t = time.time()
     A=np.ones((4,4))
     A[:,:3]=pts
     mats = np.zeros((5,4,4))
@@ -37,34 +38,11 @@ def isPointInTetra(pt,pts):
         else:
             mats[i] = np.copy(A)
             mats[i,i-1,:3]=pt
-    octree.time1+=time.time()-t
-    t = time.time()
     dets = np.linalg.det(mats)
-    octree.time2+=time.time()-t
-    t = time.time()
     if np.sum(np.sign(dets))==5 or np.sum(np.sign(dets))==-5:
-        octree.time3+=time.time()-t
         return True
     else:
-        octree.time3+=time.time()-t
         return False
-
-    """
-
-    A=np.ones((4,4))
-    A[:,:3]=pts
-    detA=np.linalg.det(A)
-
-    t = time.time()
-    for i in range(4):
-        tmp =
-        tmp[i,:3] = pt
-        det = np.linalg.det(tmp)
-        octree.time2+=time.time()-t
-        if np.sign(det)!=np.sign(detA):
-            return False
-    return True
-    """
 def interpolate(pt, pts, vectors):
     dist = np.linalg.norm(pts-pt,axis=1)
     s = np.sum(1./dist)
@@ -89,6 +67,7 @@ def cartesian(arrays, out=None):
             out[j*m:(j+1)*m,1:] = out[0:m,1:]
     return out
 
+#Octree class and methods
 class Octree:
     def __init__(self, mesh, depth):
         self.time1 = 0
