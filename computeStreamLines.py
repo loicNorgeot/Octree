@@ -5,17 +5,66 @@ import time
 import sys
 import msh
 
+import multiprocessing
+def fun(f, q_in, q_out):
+    while True:
+        i, x = q_in.get()
+        if i is None:
+            break
+        q_out.put((i, f(x)))
+def parmap(f, X, nprocs=multiprocessing.cpu_count()):
+    q_in = multiprocessing.Queue(1)
+    q_out = multiprocessing.Queue()
+    proc = [multiprocessing.Process(target=fun, args=(f, q_in, q_out))
+            for _ in range(nprocs)]
+    for p in proc:
+        p.daemon = True
+        p.start()
+    sent = [q_in.put((i, x)) for i, x in enumerate(X)]
+    [q_in.put((None, None)) for _ in range(nprocs)]
+    res = [q_out.get() for _ in range(len(sent))]
+    [p.join() for p in proc]
+    return [x for i, x in sorted(res)]
+
 def isPointInTetra(pt,pts):
+    t = time.time()
+    A=np.ones((4,4))
+    A[:,:3]=pts
+    mats = np.zeros((5,4,4))
+    for i in range(5):
+        if i == 0:
+            mats[0] = np.copy(A)
+        else:
+            mats[i] = np.copy(A)
+            mats[i,i-1,:3]=pt
+    octree.time1+=time.time()-t
+    t = time.time()
+    dets = np.linalg.det(mats)
+    octree.time2+=time.time()-t
+    t = time.time()
+    if np.sum(np.sign(dets))==5 or np.sum(np.sign(dets))==-5:
+        octree.time3+=time.time()-t
+        return True
+    else:
+        octree.time3+=time.time()-t
+        return False
+
+    """
+
     A=np.ones((4,4))
     A[:,:3]=pts
     detA=np.linalg.det(A)
+
+    t = time.time()
     for i in range(4):
-        tmp = np.copy(A)
+        tmp =
         tmp[i,:3] = pt
         det = np.linalg.det(tmp)
+        octree.time2+=time.time()-t
         if np.sign(det)!=np.sign(detA):
             return False
     return True
+    """
 def interpolate(pt, pts, vectors):
     dist = np.linalg.norm(pts-pt,axis=1)
     s = np.sum(1./dist)
@@ -42,10 +91,14 @@ def cartesian(arrays, out=None):
 
 class Octree:
     def __init__(self, mesh, depth):
+        self.time1 = 0
+        self.time2 = 0
+        self.time3 = 0
         self.depth = depth
         self.mesh = mesh
         self.getOctreeIndices()
         self.distributeTetras()
+        self.makeTetraSet()
     def getOctreeIndices(self):
         tmpPts = np.copy(self.mesh.verts[:,:3])
         tmpPts-=[self.mesh.xmin, self.mesh.ymin, self.mesh.zmin]
@@ -66,14 +119,21 @@ class Octree:
                     ptInds=mi+cartesian([[1,0],[1,0],[1,0]])
         self.tetras = [[[[] for k in range(2**self.depth)] for j in range(2**self.depth)] for j in range(2**self.depth)]
         for indTetra, tetra in enumerate(self.mesh.tets):
+            i=-1
             for ptIndex in tetra[:4]:
-                i = self.indices[ptIndex]
-                self.tetras[i[0]][i[1]][i[2]].append(indTetra)
+                j = self.indices[ptIndex]
+                self.tetras[j[0]][j[1]][j[2]].append(indTetra)
+    def makeTetraSet(self):
+        for i in range(2**self.depth):
+            for j in range(2**self.depth):
+                for k in range(2**self.depth):
+                    self.tetras[i][j][k] = set(self.tetras[i][j][k])
     def getPtIndices(self,pt):
         ind = np.copy(pt)
         ind-=[self.mesh.xmin, self.mesh.ymin, self.mesh.zmin]
         ind/=self.mesh.dims
         ind*=2**self.depth
+        ind-=1e-8
         ind = ind.astype(np.int16, copy=False)
         ind[ind==2**self.depth]=2**self.depth-1
         return ind
@@ -87,6 +147,38 @@ class Octree:
                 velocity = interpolate(pt,pts,self.mesh.vectors[ptInds])
                 break
         return velocity
+    def computeTrajectory(self, pt, step, maxIt):
+        pos = []
+        pos.append(pt)
+        velocity = self.computeVelocity(pt)
+        if velocity is None:
+            print "First velocity is none at point",pt
+            sys.exit()
+        for it in range(maxIt):
+            pt = pt + step*velocity
+            pos.append(pt)
+            velocity = self.computeVelocity(pt)
+            if velocity is None:
+                print "Velocity is none at point",pt
+                break
+            if it==maxIt-1:
+                print "Reached end of streamline at point",pt
+        return pos
+    def saveSubdivision(self, inds, outfile):
+        mesh2 = msh.Mesh(self.mesh.path)
+        mesh2.readSol()
+        for t in self.tetras[inds[0]][inds[1]][inds[2]]:
+            mesh2.tets[t,-1]=10
+        for ind in range(10):
+            mesh2.removeRef(ind)
+        mesh2.tris = np.array([])
+        mesh2.discardUnused()
+        div = self.mesh.dims/8
+        mins = [self.mesh.xmin + inds[0]*div[0], self.mesh.ymin + inds[1]*div[1], self.mesh.zmin + inds[2]*div[2]]
+        mesh3=msh.Mesh(cube=[mins[0], mins[0]+div[0], mins[1], mins[1]+div[1], mins[2], mins[2]+div[2]])
+        mesh2.fondre(mesh3)
+        mesh2.write(outfile)
+        mesh2.writeSol(outfile[:-5]+".sol")
 
 if __name__ == "__main__":
     print "1 - Opening the .mesh file and the corresponding .sol file"
@@ -97,37 +189,20 @@ if __name__ == "__main__":
 
     print "2 - Creating the octree structure"
     t = time.time()
-    octree = Octree(mesh, 4)
+    octree = Octree(mesh, 3)
     print "Octree structure created in", time.time() - t,"s."
 
     print "3 - Computing the streamlines"
     t = time.time()
+    #Parameters
     nPoints = 10
-    maxIterations = 1000
-    step = 0.01
-    initialXZ = np.random.random(size=(nPoints, 2))
+    maxIt   = 1000
+    step    = 0.01
+    #First points
+    initialXZ = np.random.normal(loc=0.5,scale=0.15,size=(nPoints,2))
     initialPts = np.insert(initialXZ, 1, 0.02, axis=1)-0.5
     initialPts = initialPts*octree.mesh.dims + octree.mesh.center
-    positions  = []
-    for traj, pt in enumerate(initialPts):
-        print "Computing trajectory", traj
-        pos = []
-        pos.append(pt)
-        velocity = octree.computeVelocity(pt)
-        if velocity == None:
-            print "First velocity is none at point",pt
-            sys.exit()
-        for it in range(maxIterations):
-            pt = pt + step*velocity
-            pos.append(pt)
-            velocity = octree.computeVelocity(pt)
-            if velocity == None:
-                print "Velocity is none at point",pt
-                break
-            if it==maxIterations-1:
-                print "Reached end of streamline at point",pt
-        positions.append(pos)
-
-    print "Streamlines computed in ", time.time() - t, "s."
-    print [len(p) for p in positions]
-    print positions[0]
+    #Actual computing
+    positions = parmap(lambda x: octree.computeTrajectory(x, step, maxIt), initialPts)
+    print "Streamlines computed in", time.time()-t
+    print "Length of each streamline:", [len(p) for p in positions]

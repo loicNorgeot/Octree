@@ -176,13 +176,18 @@ class Mesh:
     def fondre(self, otherMesh):
         off = len(self.verts)
         if len(otherMesh.tris)>0:
-            self.tris  = np.append(self.tris,  otherMesh.tris + [off, off, off, 0],  axis=0)
+            self.tris  = np.append(self.tris,  otherMesh.tris + [off, off, off, 0],  axis=0) if len(self.tris)>0 else otherMesh.tris + [off, off, off, 0]
         if len(otherMesh.tets)>0:
-            self.tets  = np.append(self.tets,  otherMesh.tets + [off, off, off, off, 0],  axis=0)
+            self.tets  = np.append(self.tets,  otherMesh.tets + [off, off, off, off, 0],  axis=0) if len(self.tets)>0 else otherMesh.tets + [off, off, off, 0]
         if len(otherMesh.quads)>0:
-            self.quads = np.append(self.quads, otherMesh.quads + [off, off, off, off, 0], axis=0)
+            self.quads = np.append(self.quads, otherMesh.quads + [off, off, off, off, 0], axis=0) if len(self.quads)>0 else otherMesh.quads + [off, off, off, 0]
+        if len(otherMesh.scalars)>0:
+            self.scalars = np.append(self.scalars, otherMesh.scalars, axis=0) if len(self.scalars)>0 else np.append(np.zeros((len(self.verts))), otherMesh.scalars, axis=0)
+        if len(otherMesh.vectors)>0:
+            self.vectors = np.append(self.vectors, otherMesh.vectors, axis=0) if len(self.vectors)>0 else np.append(np.zeros((len(self.verts),3)), otherMesh.vectors, axis=0)
         if len(otherMesh.verts)>0:
-            self.verts = np.append(self.verts, otherMesh.verts, axis=0)
+            self.verts = np.append(self.verts, otherMesh.verts, axis=0) if len(self.verts)>0 else otherMesh.verts
+
     def replaceRef(self, oldRef, newRef):
         if len(self.tris)!=0:
             self.tris[self.tris[:,-1]==oldRef,-1] = newRef
@@ -233,10 +238,14 @@ class Mesh:
             used[np.ravel(self.tris[:,:3])]=True
         if len(self.tets)>0:
             used[np.ravel(self.tets[:,:4])]=True
+        if len(self.quads)>0:
+            used[np.ravel(self.quads[:,:4])]=True
         newUsed = np.cumsum(used)
         self.verts = self.verts[used==True]
         if len(self.scalars)>0:
             self.scalars = self.scalars[used==True]
+        if len(self.vectors)>0:
+            self.vectors = self.vectors[used==True]
         if len(self.tris)>0:
             newTris = np.zeros(shape=(len(self.tris),4),dtype=int)
             newTris[:,-1] = self.tris[:,-1]
