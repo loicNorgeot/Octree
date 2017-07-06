@@ -210,3 +210,4 @@ if __name__ == "__main__":
     positions = parmap(lambda x: octree.computeTrajectory(x, step, maxIt), initialPts, nprocs=8)
     print "Streamlines computed in", time.time()-t
     print "Length of each streamline:", [len(p) for p in positions]
+    print"N'accepte pas ce changement inutile!" 
